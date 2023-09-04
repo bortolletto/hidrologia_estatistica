@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Aug 21 10:24:23 2023
+
+@author: felipe.bortolletto
+Codigo para analisar melhor seria de preciptação na bacia de porto amazonas
+"""
+import pandas as pd
+import plotly.graph_objs as go
+import os
+
+
+df = pd.read_csv("./chuva_pontos.csv",index_col = 0,parse_dates = True)
+df = df["1998":]
+df = df.resample("D").sum(min_count = 12)
+
+primeiras_datas_nao_nulas = df.apply(lambda col: col.dropna().index[0] if not col.dropna().empty else None).to_frame()
+primeiras_datas_nao_nulas.rename(columns = {0:"primeira_data_valida"},inplace= True)
+ultimas_datas_nao_nulas = df.apply(lambda col: col.dropna().index[-1] if not col.dropna().empty else None).to_frame()
+ultimas_datas_nao_nulas.rename(columns = {0:"ultimas_datas_nao_nulas"},inplace= True)
+datas = pd.merge(primeiras_datas_nao_nulas,ultimas_datas_nao_nulas,left_index = True,right_index=True)
+# Calcular o comprimento entre a primeira data válida e a última data não nula
+datas['comprimento'] = datas['ultimas_datas_nao_nulas'] - datas['primeira_data_valida']
+datas['comprimento'] = pd.to_timedelta(datas['comprimento'])
+
+# Obter os valores de dias da coluna "comprimento"
+datas['dias'] = datas['comprimento'].dt.days
+
+def define_nulos(df):
+    df_nulos = pd.DataFrame(index = df.index.year.unique())
+    for ano in df.index.year.unique():
+        temp = df.loc[df.index.year == ano]
+        for coluna in temp.columns:
+            
+            df_nulos.loc[df_nulos.index == ano,coluna] = round(temp[coluna].isnull().sum()/365,2)
+    contagem = df_nulos.sum(axis = 1).to_frame()
+    #%%
+    fig = go.Figure()
+
+
+    fig.add_trace(go.Bar(x=contagem.index, y=contagem[contagem.columns.values[0]]))
+        
+        # Atualizar o layout do gráfico
+    fig.update_layout(title='Acumulado de nulos em 109 estações', xaxis_title='Anos', yaxis_title = "nulos") 
+        
+    # Exibir o gráfico
+    fig.write_html("./plots/nulos_anuais.html")
+    #%%
+    contagem_estac = df_nulos.sum().to_frame()
+    fig2 = go.Figure()
+
+
+    fig2.add_trace(go.Bar(x=contagem_estac.index, y=contagem_estac[contagem.columns.values[0]]))
+        
+        # Atualizar o layout do gráfico
+    fig2.update_layout(title='Acumulados por estação', xaxis_title='Anos', yaxis_title = "nulos") 
+        
+    # Exibir o gráfico
+    fig2.write_html("./plots/nulos_por_estacao.html")
+    
+    return df_nulos
+#%%
+def plota_todas(df):
+    
+    
+    fig = go.Figure()
+    for coluna in df.columns:
+        fig.add_trace(go.Scatter(x = df.index , y = df[coluna],name = coluna,connectgaps=False))
+        
+        
+    fig.write_html("./plots/todas as chuvas.html")
+    return "arquivo './plots/todas as chuvas.html' ja disponivel!"
+
+
+def curva_permanencia(df):
+    
+    end_temp = pd.DataFrame()
+    for coluna in df:
+        temp = df[coluna].to_frame()
+        temp = temp.sort_values(coluna)
+        temp = temp.reset_index()
+        temp.drop(columns =["hordatahora"],inplace = True)
+        end_temp = pd.merge(end_temp,temp,how = "outer",left_index=True,right_index=True)
+    return end_temp
+
+
+def plota_cp(cp):
+    fig = go.Figure()
+    nulos_na_serie = pd.DataFrame(index = cp.columns)
+    for estacao in cp.columns:
+        temp = cp[estacao].to_frame()
+        temp = temp.dropna()
+        
+        data = datas.loc[datas.index == estacao, "dias"].values[0]
+        nulo_= data - len(temp)
+        nulos_na_serie.loc[nulos_na_serie.index == estacao,"numero_de_nulos_dentro_do_intervalo_da_serie"] = nulo_
+        nulos_na_serie.loc[nulos_na_serie.index == estacao,"numero_total_de"] = data
+        nulos_na_serie.loc[nulos_na_serie.index == estacao,"porcent"] = nulo_/data
+        temp["probabilidade"] = [(len(temp)-i +1)/(len(temp)+1) for i in temp.index]
+        fig.add_trace(go.Scatter(x = temp[estacao], y = temp["probabilidade"],name = estacao,connectgaps=False))
+    fig.write_html("./plots/cps.html")
+    return nulos_na_serie
+
+
+
+
+def localiza(estac):
+    temp = df[estac]
+    print(temp)
+    return temp
+
+#%%
+# test = df[["25314929","25464917","25534939","25524921","25484909","25424911","25674931"]]
+
+
+def plota(df):
+    
+    try:
+        os.remove('./plots/p_graph.html')
+    except:
+        print("arquivo 'p_graph.html' inexistente")
+    with open('./plots/p_graph.html', 'a') as f:
+        
+        for coluna in df.columns:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x = df[coluna].index, y = df[coluna],name = coluna,connectgaps=False))
+            fig.update_layout(title=coluna)
+            
+            f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
+            
+cp  = curva_permanencia(df)
+nulos_ = plota_cp(cp)
+nulos = define_nulos(df)
+
+# plota(test)
+
+
+
+
+
+
+#%%
+# import pandas as pd 
+# import plotly.graph_objs as go
+# df = pd.read_csv("/discolocal/felipe/lisflood_pm/calibracao_manual/tabelas/resultados/analise_chuva.csv",index_col = 0,parse_dates = True)
+# df2= pd.read_csv("/discolocal/felipe/lisflood_pm/chuva/chuva_pontos.csv",index_col = 0,parse_dates = True)
+# df2 = df2.resample("D").sum(min_count=3)
+# fig = go.Figure()
+# for coluna in df.columns:
+    
+#     fig.add_trace(go.Scatter(x = df[coluna].index, y = df[coluna],name = coluna,connectgaps=False))
+
+    
+# fig.write_html("/discolocal/felipe/lisflood_pm/calibracao_manual/tabelas/resultados/analise_chuva.html")
+
+# filtered_columns = df.columns[(df != 0).sum() > 50]
+
+# # Criar um novo DataFrame com as colunas filtradas
+# new_df = df[filtered_columns]
+# new_df2 = df2[filtered_columns]
+# new_df2 = new_df2.resample("D").sum()
