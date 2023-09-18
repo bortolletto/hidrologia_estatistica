@@ -55,7 +55,7 @@ for ano in dados.index.year.unique():
 
             temp[estacao] = temp[estacao]* temp_loc.loc[temp_loc.codigo == int(estacao),"h"].values[0]
             
-        chuva_ano = temp.sum(axis = 1).to_frame()
+        chuva_ano = temp.mean(axis = 1).to_frame()
         chuva_ano.rename(columns = {0:"chuva"},inplace = True)
         chuva_ano = chuva_ano.resample("D").sum(min_count = 20)
         # indice_x = (base_temp['x'] == x).argmax()
@@ -68,4 +68,4 @@ for ano in dados.index.year.unique():
             base_temp.loc[{'time': tempo, 'x': x, 'y':y}] = novo_valor
     print(f"Estamos no ano de :{ano}")
             
-base_temp.to_netcdf("../../lf_pm/catch/meteo/chuvas/nova_chuva_atualiziada.nc")
+base_temp.to_netcdf("../../lf_pm/catch/meteo/chuvas/nova_chuva_atualiziada2.nc")
