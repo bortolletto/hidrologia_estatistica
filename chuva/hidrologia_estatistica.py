@@ -149,7 +149,7 @@ class Chuva():
         for ano in self.anos:
             temp = df.loc[df.index.year == ano]
             if temp["horleitura"].isna().all():
-                print(f"{ano}: Todos os dados são nulos.")
+                # print(f"{ano}: Todos os dados são nulos.")
                 continue
             
             menor_chuva =  temp.loc[temp["horleitura"] == temp["horleitura"].min()].index.month.values[0]
@@ -162,10 +162,10 @@ class Chuva():
 #%%    
 class hidro_estatic(Vazao,Chuva):
     def __init__(self):
-        self.vazao_d = pd.read_csv("./vazao.csv",index_col = 0 ,parse_dates = True).iloc[::-1]
+        self.vazao_d = pd.read_csv("./csvs/vazao.csv",index_col = 0 ,parse_dates = True).iloc[::-1]
         self.anos = self.vazao_d.index.year.unique()
         self.df_dados = pd.DataFrame(index = self.anos)
-        self.chuva = pd.read_csv("./chuva_25334953_Porto Amazonas.csv",index_col = 0,parse_dates =True)
+        self.chuva = pd.read_csv("./csvs/chuva_25334953_Porto Amazonas.csv",index_col = 0,parse_dates =True)
         self.chuva = self.chuva.loc[self.chuva.horqualidade == 0]
     def roda_todas(self):
         

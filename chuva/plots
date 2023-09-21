@@ -1,0 +1,333 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep 19 20:45:48 2023
+
+@author: felipe
+"""
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+vazao_d = pd.read_csv("./csvs/vazao.csv",index_col = 0 ,parse_dates = True).iloc[::-1]
+vazao_d["ano_hidrologico"] = vazao_d.index.to_period('M').asfreq('A-FEB').astype(int)+ 1969
+
+
+vazao_m= vazao_d.resample("M",label = "left",closed = "right").mean()
+
+vazao_m["ano"] = vazao_m.index.year
+vazao_m["ano_hidrologico"] = vazao_m.index.to_period('M').asfreq('A-FEB').astype(int)+ 1969
+
+ano_hidrologico_ = pd.DataFrame(columns = vazao_m.index.year.unique())
+ano_civil_       = pd.DataFrame(columns = vazao_m.index.year.unique())
+    #%% box_plot media mensal por ano
+def criar_boxplot_generico(dados, rótulos, título, salvar_caminho,anos_unicos):
+    plt.figure(figsize=(10, 6))
+    plt.boxplot(dados)
+
+    ax = plt.gca()
+    plt.xticks(rotation=270)
+    rótulos_exibidos = anos_unicos[::2] 
+    posicoes_exibidas = [anos_unicos.index(ano) + 1 for ano in rótulos_exibidos]
+    
+
+    ax.set_xticks(posicoes_exibidas)
+    ax.set_xticklabels(rótulos_exibidos)
+
+    plt.ylabel('Vazão Média Mensal')
+    plt.title(título)
+
+    # Salvar a imagem com boa resolução
+    plt.savefig(salvar_caminho, dpi=300, bbox_inches='tight')
+
+    # Mostrar o gráfico (opcional)
+    plt.show()
+
+# Exemplo de uso
+anos_unicos = sorted(set(vazao_m['ano_hidrologico']))
+dados = [group['vazao'] for _, group in vazao_m.groupby('ano_hidrologico')]
+rótulos = sorted(set(vazao_m['ano_hidrologico']))
+título = 'Gráfico de Boxplot da Vazão Média Mensal por Ano Hidrológico'
+caminho_salvar = '../imagens/box_plot_media_mensal.png'
+
+criar_boxplot_generico(dados, rótulos, título, caminho_salvar,anos_unicos)
+#%%
+meses = {
+    1: 'Janeiro',
+    2: 'Fevereiro',
+    3: 'Março',
+    4: 'Abril',
+    5: 'Maio',
+    6: 'Junho',
+    7: 'Julho',
+    8: 'Agosto',
+    9: 'Setembro',
+    10: 'Outubro',
+    11: 'Novembro',
+    12: 'Dezembro'
+}
+
+
+vazao_d["dia"] = vazao_d.index.day
+vazao_d["mes"] = vazao_d.index.month
+dados = vazao_d.copy()
+
+plt.figure(figsize=(12, 8))
+
+# dados = [group['vazao'] for _, group in vazao_d.groupby(['mes',"dia"])]
+for mes in dados.index.month.unique():
+    plt.figure(figsize=(10, 6))
+    valores_mes = []
+    # plt.subplot(3, 4, mes)
+    lista = []
+    for dia in dados.index.day.unique():
+        temp = dados.loc[(dados.mes == mes) & (dados.dia == dia),"vazao"]    
+        lista.append(temp)
+    plt.boxplot(lista)
+    plt.title(f'Mês {meses[mes]}')
+    plt.ylabel(f'Vazão Diaria do mês de {meses[mes]}')
+    plt.xlabel('Dias do Mês')
+
+    
+    plt.savefig(f"../imagens/box_plot_diario_{meses[mes]}.png", dpi=300, bbox_inches='tight')
+#%% vazao media anual:
+
+vazao_y = vazao_d.resample("Y",label = "right",closed = "left").mean()
+vazao_y["ano"] =vazao_y.index.year
+dados = vazao_y["vazao"]
+    
+# Histograma:
+        
+    
+import math
+
+def sturges_rule(data):
+    """
+    Calcula o número de bins usando a regra de Sturges.
+
+    Args:
+        data (list): Uma lista de valores.
+
+    Returns:
+        int: O número de bins calculado de acordo com a regra de Sturges.
+    """
+    num_bins = 1 + int(math.log2(len(data)))
+    return num_bins
+
+
+plt.hist(dados, bins=sturges_rule(dados), color='blue', alpha=0.7)  # "bins" define o número de intervalos no histograma
+
+# Personalizar o gráfico
+plt.title('Frquencias de ocorrencias da médida anual')
+plt.xlabel('M³/s')
+plt.ylabel('Frequência')
+plt.grid(True)
+
+# Mostrar o gráfico
+# plt.show()
+plt.savefig("../imagens/histograma_médio_anual.png", dpi=300, bbox_inches='tight')
+#%% exercicio 7: Não conseguimos plotar o box_plot, rever o codigo dps
+vazao_y.drop(columns = ['ano_hidrologico', 'dia', 'mes', 'ano'],inplace = True)
+vazao_y.vazao.to_frame()
+plt.figure(figsize=(8, 6))
+plt.boxplot(vazao_y.vazao, vert=True)
+
+plt.title('Box-Plot das Vazões Médias Anuais')
+plt.xlabel('Vazões Médias Anuais')
+plt.grid(True)
+plt.show()
+#%% 8) Construa uma curva de permanência das vazões com toda a série de dados (na escala diária).
+
+df = vazao_d.copy() 
+valores_ordenados = df.vazao.sort_values().to_frame()
+n = len(valores_ordenados)
+valores_ordenados["p"] = [(n-i+1)/(n+1) for i in range(n)]
+valores_ordenados["p-1"] = 1 - valores_ordenados["p"]
+
+
+plt.figure(figsize=(12, 8))
+
+plt.plot(valores_ordenados["vazao"], valores_ordenados["p"], linestyle='-', color='b')
+
+# Personaliza o gráfico
+plt.title('Curva de Permanência')
+plt.xlabel('Vazões')
+plt.ylabel('Probabilidade de Permanência')
+plt.grid(True)
+# plt.show()
+
+plt.savefig("../imagens/curva_permanencia_dados_diarios(8).png", dpi=300, bbox_inches='tight')
+
+#%% 9) Construa uma curva de permanência das vazões médias mensais e compare com a anterior. Discuta as diferenças.
+
+
+
+df = vazao_m.copy() 
+valores_ordenados = df.vazao.sort_values().to_frame()
+n = len(valores_ordenados)
+valores_ordenados["p"] = [(n-i+1)/(n+1) for i in range(n)]
+valores_ordenados["p-1"] = 1 - valores_ordenados["p"]
+
+
+plt.figure(figsize=(12, 8))
+
+plt.plot(valores_ordenados["vazao"], valores_ordenados["p"], linestyle='-', color='b')
+
+# Personaliza o gráfico
+plt.title('Curva de Permanência')
+plt.xlabel('Vazões')
+plt.ylabel('Probabilidade de Permanência')
+plt.grid(True)
+# plt.show()
+
+plt.savefig("../imagens/curva_permanencia_medias_mensais(9).png", dpi=300, bbox_inches='tight')
+
+#%% 10) Construa uma curva de permanência para cada ano, apresente em gráficos sobrepostos e compare com a curva
+#       construída com a série completa. Discuta as observações.
+
+df = vazao_d.copy()
+# Suponha que você já tenha seu DataFrame 'df' com os dados de vazão e 'vazao_d' seja o DataFrame de dados
+
+# Determine os anos únicos em seus dados
+anos_unicos = vazao_d.index.year.unique()
+
+# Divida os anos em quatro grupos (cada grupo conterá 1/4 dos anos)
+grupos_de_anos = [
+    anos_unicos[:len(anos_unicos)//4],
+    anos_unicos[len(anos_unicos)//4:2*len(anos_unicos)//4],
+    anos_unicos[2*len(anos_unicos)//4:3*len(anos_unicos)//4],
+    anos_unicos[3*len(anos_unicos)//4:]
+]
+
+# Crie um gráfico para cada grupo de anos
+fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+
+for i, anos in enumerate(grupos_de_anos):
+    ax = axs[i//2, i%2]
+    ax.set_title(f'Gráfico {i+1}')
+    
+    for ano in anos:
+        temp = df.loc[f"{ano}"]
+        valores_ordenados = temp.vazao.sort_values().to_frame()
+        n = len(valores_ordenados)
+        valores_ordenados["p"] = [(n-i+1)/(n+1) for i in range(n)]
+        valores_ordenados["p-1"] = 1 - valores_ordenados["p"]
+        
+        ax.plot(valores_ordenados["vazao"], valores_ordenados["p"], linestyle='-', label=ano)
+    
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05),
+          ncol=3, fancybox=True, shadow=True)
+    ax.set_xlabel('Vazões')
+    ax.set_ylabel('Probabilidade de Permanência')
+    ax.grid(True)
+
+# Ajuste o layout dos gráficos
+plt.tight_layout()
+
+# Mostrar os gráficos
+# plt.show()
+
+plt.savefig("../imagens/curva_permanencia_diaria_ano_a_ano(10).png", dpi=300, bbox_inches='tight')
+
+#%% 11) O que acontece na curva de permanência quando um mesmo valor na série se repete? Discuta.
+
+#utilizando de temp do exemplo anterior:
+temp.loc["2019-04":"2019-08"] = 1
+
+valores_ordenados = temp.vazao.sort_values().to_frame()
+n = len(valores_ordenados)
+valores_ordenados["p"] = [(n-i+1)/(n+1) for i in range(n)]
+valores_ordenados["p-1"] = 1 - valores_ordenados["p"]
+
+
+plt.figure(figsize=(12, 8))
+
+plt.plot(valores_ordenados["vazao"], valores_ordenados["p"], linestyle='-', color='b')
+
+# Personaliza o gráfico
+plt.title('Curva de Permanência')
+plt.xlabel('Vazões')
+plt.ylabel('Probabilidade de Permanência')
+plt.grid(True)
+
+plt.savefig("../imagens/comparaca_dadosrepetidos1(11).png", dpi=300, bbox_inches='tight')
+
+# Como podemos ver no grafico, a curva acaba tendo uma "queda" ou o equivalente a um degrau, mesmos valores de vazão passam a possuir valores
+# distoantes de probabilidade oque gera esse efeito ao grafico. 
+# veremos a difença quando droparmos os dados duplicados:
+    
+test = temp.drop_duplicates()
+valores_ordenados = test.vazao.sort_values().to_frame()
+n = len(valores_ordenados)
+valores_ordenados["p"] = [(n-i+1)/(n+1) for i in range(n)]
+valores_ordenados["p-1"] = 1 - valores_ordenados["p"]
+
+
+plt.figure(figsize=(12, 8))
+
+plt.plot(valores_ordenados["vazao"], valores_ordenados["p"], linestyle='-', color='b')
+
+# Personaliza o gráfico
+plt.title('Curva de Permanência')
+plt.xlabel('Vazões')
+plt.ylabel('Probabilidade de Permanência')
+plt.grid(True)
+
+# agora oque vemos é um salto na vazão dos dados, visto que os dados duplicados foram retirados e novas probabilidades forama atribuidas. 
+
+plt.savefig("../imagens/comparaca_dadosrepetidos2(11).png", dpi=300, bbox_inches='tight')
+#%% 12
+
+    #%%
+# # dados.set_index(['dia', 'mes'], inplace=True)
+
+# # Agrupe os dados por 'dia' e 'mes' e calcule a média histórica
+# media_historica = dados.groupby(['mes', 'dia'])['vazao'].mean()
+# print(media_historica)
+
+# plt.figure(figsize=(12, 8))
+# meses_unicos = media_historica.index.get_level_values('mes').unique()
+
+# # Itere sobre os meses e crie um gráfico de boxplot para cada mês
+# for mes in meses_unicos:
+#     dados_mes = media_historica[media_historica.index.get_level_values('mes') == mes]
+#     plt.subplot(3, 4, mes)  # 3 linhas x 4 colunas de gráficos (ajuste conforme necessário)
+#     plt.boxplot(dados_mes.values)
+#     plt.title(f'Mês {mes}')
+#     plt.ylabel('Média Histórica de Vazão Diaria')
+#     plt.xlabel('Dias do Mês')
+
+# plt.tight_layout()  # Organiza os subplots automaticamente
+# plt.show()
+# plt.savefig('../imagens/box_plot_media_diaria_cada_mês.png', dpi=300, bbox_inches='tight')
+
+
+
+#%%
+# Mostrar o gráfico
+# plt.show()
+# def plota_bx(dados):
+#     import matplotlib.pyplot as plt
+    
+#     # Seus dados
+
+    
+#     # Criar um gráfico de boxplot
+#     plt.boxplot(dados)
+    
+#     # Adicione um título e rótulos aos eixos, se desejar
+#     plt.title('Gráfico de Boxplot')
+#     plt.xlabel('Eixo X')
+#     plt.ylabel('Eixo Y')
+    
+#     # Mostrar o gráfico
+#     plt.show()
+
+
+# for ano in vazao_m.index.year.unique():
+#     temp = vazao_m.loc[vazao_m.ano == ano]
+#     dados = temp.vazao
+#     plota_bx(dados)
+# for ano in vazao_m.index.year.unique():
+#     temp = vazao_m.loc[vazao_m.ano == ano]
