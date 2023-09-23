@@ -125,7 +125,7 @@ plt.ylabel('Frequência')
 plt.grid(True)
 
 # Mostrar o gráfico
-# plt.show()
+# ()
 plt.savefig("../imagens/histograma_médio_anual.png", dpi=300, bbox_inches='tight')
 #%% exercicio 7: Não conseguimos plotar o box_plot, rever o codigo dps
 vazao_y.drop(columns = ['ano_hidrologico', 'dia', 'mes', 'ano'],inplace = True)
@@ -155,7 +155,7 @@ plt.title('Curva de Permanência')
 plt.xlabel('Vazões')
 plt.ylabel('Probabilidade de Permanência')
 plt.grid(True)
-# plt.show()
+# ()
 
 plt.savefig("../imagens/curva_permanencia_dados_diarios(8).png", dpi=300, bbox_inches='tight')
 
@@ -179,7 +179,7 @@ plt.title('Curva de Permanência')
 plt.xlabel('Vazões')
 plt.ylabel('Probabilidade de Permanência')
 plt.grid(True)
-# plt.show()
+# ()
 
 plt.savefig("../imagens/curva_permanencia_medias_mensais(9).png", dpi=300, bbox_inches='tight')
 
@@ -226,7 +226,7 @@ for i, anos in enumerate(grupos_de_anos):
 plt.tight_layout()
 
 # Mostrar os gráficos
-# plt.show()
+# ()
 
 plt.savefig("../imagens/curva_permanencia_diaria_ano_a_ano(10).png", dpi=300, bbox_inches='tight')
 
@@ -277,57 +277,444 @@ plt.grid(True)
 # agora oque vemos é um salto na vazão dos dados, visto que os dados duplicados foram retirados e novas probabilidades forama atribuidas. 
 
 plt.savefig("../imagens/comparaca_dadosrepetidos2(11).png", dpi=300, bbox_inches='tight')
-#%% 12
+#%% 11 vazoes maximas mpedias anuais, solução da questão.
 
-    #%%
-# # dados.set_index(['dia', 'mes'], inplace=True)
+vazoes_maximas = vazao_d.groupby("ano_hidrologico").max()
+v1 = vazoes_maximas.iloc[:20,]
+v2 = vazoes_maximas.iloc[20:40]
+v3 = vazoes_maximas.iloc[40:60]
+v4 = vazoes_maximas.iloc[60:]
 
-# # Agrupe os dados por 'dia' e 'mes' e calcule a média histórica
-# media_historica = dados.groupby(['mes', 'dia'])['vazao'].mean()
-# print(media_historica)
 
-# plt.figure(figsize=(12, 8))
-# meses_unicos = media_historica.index.get_level_values('mes').unique()
+vazoes_maximas.mean()
+v1.mean()
+v2.mean()
+v3.mean()
+v4.mean()
 
-# # Itere sobre os meses e crie um gráfico de boxplot para cada mês
-# for mes in meses_unicos:
-#     dados_mes = media_historica[media_historica.index.get_level_values('mes') == mes]
-#     plt.subplot(3, 4, mes)  # 3 linhas x 4 colunas de gráficos (ajuste conforme necessário)
-#     plt.boxplot(dados_mes.values)
-#     plt.title(f'Mês {mes}')
-#     plt.ylabel('Média Histórica de Vazão Diaria')
-#     plt.xlabel('Dias do Mês')
+# Todas são boas estimativas do que seria a vzão média anual, os dados oscilam entre uma faixa de valores de acordo com os anos de cada dataset
+# A serie que contem todos os valores de dados, é a serie mais significativa e que se pode ter maior segunrança sobre seus valores, visto que 
+# o conjunto da amostra utilizada é muito maior que os demais e consequentemente mais perto do que seria a média populacional.
+# Vemos que o conjunto de 20 anos de v3(datas) possui as maiores vazoes do conjunto total de amostras, alem disso o conjunto v2 possui os menores
+# valores de vazão . 
+#%% 13 Diagrama Q-Q, esse diagrama é a curva de probabilidade plotada junto com a curva de probabilidade de vazão. 
 
-# plt.tight_layout()  # Organiza os subplots automaticamente
-# plt.show()
-# plt.savefig('../imagens/box_plot_media_diaria_cada_mês.png', dpi=300, bbox_inches='tight')
+chuva = pd.read_csv("./csvs/chuva_25334953_Porto Amazonas.csv",index_col = 0 ,parse_dates = True)
+chuva = chuva.loc[chuva.horqualidade == 0]
+chuva.drop(columns = ["horqualidade"],inplace = True)
+chuva_d = chuva.resample('D',label = "left",closed = "left").sum()
 
+def cp (df,coluna = "vazao"):
+    valores_ordenados = df[coluna].sort_values().to_frame()
+    valores_ordenados = valores_ordenados.dropna()
+    n = len(valores_ordenados)
+    valores_ordenados["p"] = [(n-i+1)/(n+1) for i in range(n)]
+    valores_ordenados["p-1"] = 1 - valores_ordenados["p"]
+    return valores_ordenados
+
+
+chuva_cp = cp(chuva,"horleitura")
+vazao_cp = cp(vazao_d)
+
+fig, ax1 = plt.subplots(figsize=(8, 6))
+
+# Configurar o primeiro eixo y (vazão)
+ax1.set_xlabel('Probabilidade')
+ax1.set_ylabel('Chuva', color='blue')
+ax1.scatter(chuva_cp.p, chuva_cp.horleitura, color='blue', label='Vazão')
+ax1.tick_params(axis='y', labelcolor='blue')
+
+# Criar um segundo eixo y (precipitação)
+ax2 = ax1.twinx()
+ax2.set_ylabel('Vazao', color='red')
+ax2.scatter(vazao_cp.p, vazao_cp.vazao, color='red', label='Precipitação')
+ax2.tick_params(axis='y', labelcolor='red')
+
+# Título e legenda
+plt.title('Gráfico de Dispersão com Eixos Distintos para Vazão e Precipitação')
+fig.tight_layout()
+
+# Exibir o gráfico
+# ()
+
+
+plt.savefig("../imagens/grafico Q-Q(13).png", dpi=300, bbox_inches='tight')
+
+#%%14 distribuiçoes das vazoes medias anuais
+
+from scipy.stats import norm, lognorm, gamma,expon,beta
+import numpy as np
+
+dados = vazao_d.groupby("ano_hidrologico").mean()
+dados = dados["vazao"]
+dados = dados.sort_values()
+
+# Plot a empírica
+ecdf = cp(dados.to_frame())
+
+# Ajustar as distribuições
+parametros_norm = norm.fit(dados)
+parametros_beta = beta.fit(dados)  
+parametros_gamma = gamma.fit(dados)
+parametros_exponencial = expon.fit(dados)
+
+
+# Plot da função de densidade de probabilidade das distribuições ajustadas
+x = dados
+
+pdf_norm = norm.pdf(x, *parametros_norm)
+pdf_beta = beta.pdf(x, *parametros_beta)  # Distribuição beta
+pdf_gamma = gamma.pdf(x, *parametros_gamma)
+pdf_exponencial = expon.pdf(x, *parametros_exponencial)
+
+cdf_norm = norm.cdf(x, *parametros_norm)
+cdf_beta = beta.cdf(x, *parametros_beta)  # Distribuição beta
+cdf_gamma = gamma.cdf(x, *parametros_gamma)
+cdf_exponencial = expon.cdf(x, *parametros_exponencial)
+
+
+fig, ax1 = plt.subplots(figsize=(8, 6))
+
+# Plot do histograma dos dados
+ax1.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+
+ax1.plot(x, pdf_norm, 'r-', label='Normal')
+ax1.plot(x, pdf_beta, 'c-', label='Beta')  # Distribuição beta
+ax1.plot(x, pdf_gamma, 'y-', label='Gama')
+ax1.plot(x, pdf_exponencial, 'm-', label='Exponencial')
+    
+ax1.set_xlabel('Vazões Médias Anuais')
+ax1.set_ylabel('Densidade de Probabilidade')
+ax1.legend(loc='upper left')
+
+# Cria um segundo eixo vertical
+ax2 = ax1.twinx()
+
+# Plota dados no segundo eixo vertical (substitua com seus próprios dados)
+
+ax2.plot(x, cdf_norm, 'r-', label='Normal acum')
+ax2.plot(x, cdf_beta, 'c-', label='Beta acum')  # Distribuição beta
+ax2.plot(x, cdf_gamma, 'y-', label='Gama acum')
+ax2.plot(x, cdf_exponencial, 'm-', label='Exponencial acum')
+    
+ax2.set_ylabel('CDF')
+ax2.legend(loc='upper right')
+
+# Exibe o gráfico
+()
+plt.savefig("../imagens/14_2 distribuiçoes das vazoes medias anuais.png", dpi=300, bbox_inches='tight')
 
 
 #%%
-# Mostrar o gráfico
-# plt.show()
-# def plota_bx(dados):
-#     import matplotlib.pyplot as plt
-    
-#     # Seus dados
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 8))
+fig.subplots_adjust(hspace=0.4)
 
-    
-#     # Criar um gráfico de boxplot
-#     plt.boxplot(dados)
-    
-#     # Adicione um título e rótulos aos eixos, se desejar
-#     plt.title('Gráfico de Boxplot')
-#     plt.xlabel('Eixo X')
-#     plt.ylabel('Eixo Y')
-    
-#     # Mostrar o gráfico
-#     plt.show()
+# Distribuição Normal
+ax1 = axes[0,0]
+ax1.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax1.plot(x, pdf_norm, 'r-', label='Normal')
+ax1.set_xlabel('Vazões Médias Anuais')
+ax1.set_ylabel('Densidade de Probabilidade')
+ax1.set_title('Distribuição Normal')
+
+ax2 = ax1.twinx()
+ax2.plot(x, cdf_norm, 'g--', label='Normal acumulada')
+lines1, labels1 = ax1.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+
+ax1.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+# Repita o processo para os outros subplots
+ax3 = axes[0, 1]
+ax3.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax3.plot(x, pdf_beta, 'g-', label='Log-Normal')
+ax3.set_xlabel('Vazões Médias Anuais')
+ax3.set_ylabel('Densidade de Probabilidade')
+ax3.legend()
+ax3.set_title('Distribuição Beta')
+
+ax4 = ax3.twinx()
+ax4.plot(x, cdf_beta, 'c--', label='Beta acumulada')
+
+lines1, labels1 = ax3.get_legend_handles_labels()
+lines2, labels2 = ax4.get_legend_handles_labels()
+
+ax3.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+
+ax5 = axes[1, 0]
+ax5.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax5.plot(x, pdf_gamma, 'y-', label='Gama')
+ax5.set_xlabel('Vazões Médias Anuais')
+ax5.set_ylabel('Densidade de Probabilidade')
+ax5.legend()
+ax5.set_title('Distribuição Gama')
+
+ax6 = ax5.twinx()
+ax6.plot(x, cdf_gamma, 'k--', label='Gama Acumulada')
+lines1, labels1 = ax5.get_legend_handles_labels()
+lines2, labels2 = ax6.get_legend_handles_labels()
+ax5.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+
+ax7 = axes[1, 1]
+ax7.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax7.plot(x, pdf_exponencial, 'm-', label='Exponencial')
+ax7.set_xlabel('Vazões Médias Anuais')
+ax7.set_ylabel('Densidade de Probabilidade')
+ax7.set_title('Distribuição Exponencial')
+
+ax8 = ax7.twinx()
+ax8.plot(x, cdf_exponencial, 'r--', label='Exponencial Acumulada')
+lines1, labels1 = ax7.get_legend_handles_labels()
+lines2, labels2 = ax8.get_legend_handles_labels()
+
+ax8.legend(lines1 + lines2, labels1 + labels2, loc='center right')
 
 
-# for ano in vazao_m.index.year.unique():
-#     temp = vazao_m.loc[vazao_m.ano == ano]
-#     dados = temp.vazao
-#     plota_bx(dados)
-# for ano in vazao_m.index.year.unique():
-#     temp = vazao_m.loc[vazao_m.ano == ano]
+()
+plt.savefig("../imagens/14 distribuiçoes das vazoes medias anuais.png", dpi=300, bbox_inches='tight')
+
+
+#%%
+#testes de aderencia
+
+from scipy.stats import kstest, chisquare
+
+
+#%% 15 distribuiçoes das vazoes maximas anuais
+
+from scipy.stats import norm, lognorm, gamma,expon,beta
+import numpy as np
+
+dados = vazao_d.groupby("ano_hidrologico").max()
+dados = dados["vazao"]
+dados = dados.sort_values()
+
+# Plot a empírica
+ecdf = cp(dados.to_frame())
+
+# Ajustar as distribuições
+parametros_norm = norm.fit(dados)
+parametros_beta = beta.fit(dados)  
+parametros_gamma = gamma.fit(dados)
+parametros_exponencial = expon.fit(dados)
+
+
+# Plot da função de densidade de probabilidade das distribuições ajustadas
+x = dados
+
+pdf_norm = norm.pdf(x, *parametros_norm)
+pdf_beta = beta.pdf(x, *parametros_beta)  # Distribuição beta
+pdf_gamma = gamma.pdf(x, *parametros_gamma)
+pdf_exponencial = expon.pdf(x, *parametros_exponencial)
+
+cdf_norm = norm.cdf(x, *parametros_norm)
+cdf_beta = beta.cdf(x, *parametros_beta)  # Distribuição beta
+cdf_gamma = gamma.cdf(x, *parametros_gamma)
+cdf_exponencial = expon.cdf(x, *parametros_exponencial)
+
+
+fig, ax1 = plt.subplots(figsize=(8, 6))
+
+# Plot do histograma dos dados
+ax1.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+
+ax1.plot(x, pdf_norm, 'r-', label='Normal')
+ax1.plot(x, pdf_beta, 'c-', label='Beta')  # Distribuição beta
+ax1.plot(x, pdf_gamma, 'y-', label='Gama')
+ax1.plot(x, pdf_exponencial, 'm-', label='Exponencial')
+    
+ax1.set_xlabel('Vazões Médias Anuais')
+ax1.set_ylabel('Densidade de Probabilidade')
+ax1.legend(loc='upper left')
+
+# Cria um segundo eixo vertical
+ax2 = ax1.twinx()
+
+# Plota dados no segundo eixo vertical (substitua com seus próprios dados)
+
+ax2.plot(x, cdf_norm, 'r-', label='Normal acum')
+ax2.plot(x, cdf_beta, 'c-', label='Beta acum')  # Distribuição beta
+ax2.plot(x, cdf_gamma, 'y-', label='Gama acum')
+ax2.plot(x, cdf_exponencial, 'm-', label='Exponencial acum')
+    
+ax2.set_ylabel('CDF')
+ax2.legend(loc='upper right')
+
+# Exibe o gráfico
+
+plt.savefig("../imagens/15_2 distribuiçoes das vazoes maximas anuais.png", dpi=300, bbox_inches='tight')
+
+
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 8))
+fig.subplots_adjust(hspace=0.4)
+
+# Distribuição Normal
+ax1 = axes[0,0]
+ax1.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax1.plot(x, pdf_norm, 'r-', label='Normal')
+ax1.set_xlabel('Vazões Médias Anuais')
+ax1.set_ylabel('Densidade de Probabilidade')
+ax1.set_title('Distribuição Normal')
+
+ax2 = ax1.twinx()
+ax2.plot(x, cdf_norm, 'g--', label='Normal acumulada')
+lines1, labels1 = ax1.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+
+ax1.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+# Repita o processo para os outros subplots
+ax3 = axes[0, 1]
+ax3.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax3.plot(x, pdf_beta, 'g-', label='Log-Normal')
+ax3.set_xlabel('Vazões Médias Anuais')
+ax3.set_ylabel('Densidade de Probabilidade')
+ax3.legend()
+ax3.set_title('Distribuição Beta')
+
+ax4 = ax3.twinx()
+ax4.plot(x, cdf_beta, 'c--', label='Beta acumulada')
+
+lines1, labels1 = ax3.get_legend_handles_labels()
+lines2, labels2 = ax4.get_legend_handles_labels()
+
+ax3.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+
+ax5 = axes[1, 0]
+ax5.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax5.plot(x, pdf_gamma, 'y-', label='Gama')
+ax5.set_xlabel('Vazões Médias Anuais')
+ax5.set_ylabel('Densidade de Probabilidade')
+ax5.legend()
+ax5.set_title('Distribuição Gama')
+
+ax6 = ax5.twinx()
+ax6.plot(x, cdf_gamma, 'k--', label='Gama Acumulada')
+lines1, labels1 = ax5.get_legend_handles_labels()
+lines2, labels2 = ax6.get_legend_handles_labels()
+ax5.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+
+ax7 = axes[1, 1]
+ax7.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax7.plot(x, pdf_exponencial, 'm-', label='Exponencial')
+ax7.set_xlabel('Vazões Médias Anuais')
+ax7.set_ylabel('Densidade de Probabilidade')
+ax7.set_title('Distribuição Exponencial')
+
+ax8 = ax7.twinx()
+ax8.plot(x, cdf_exponencial, 'r--', label='Exponencial Acumulada')
+lines1, labels1 = ax7.get_legend_handles_labels()
+lines2, labels2 = ax8.get_legend_handles_labels()
+
+ax8.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+
+
+
+plt.savefig("../imagens/15 distribuiçoes das vazoes maximas anuais.png", dpi=300, bbox_inches='tight')
+
+
+
+#testes de aderencia
+
+
+#%% 16 vazoes minimas de 7 dias consecutivos
+
+from scipy.stats import norm, lognorm, gamma,expon,beta
+import numpy as np
+
+dados = vazao_d['vazao'].rolling(window=7).mean().to_frame()
+dados ["ano_hidrologico"] = dados .index.to_period('M').asfreq('A-FEB').astype(int)+ 1969
+dados = vazao_d.groupby("ano_hidrologico").min()
+dados = dados["vazao"]
+dados = dados.sort_values()
+
+# Plot a empírica
+ecdf = cp(dados.to_frame())
+
+# Ajustar as distribuições
+parametros_norm = norm.fit(dados)
+parametros_beta = beta.fit(dados)  
+parametros_gamma = gamma.fit(dados)
+parametros_exponencial = expon.fit(dados)
+
+
+# Plot da função de densidade de probabilidade das distribuições ajustadas
+x = dados
+
+pdf_norm = norm.pdf(x, *parametros_norm)
+pdf_beta = beta.pdf(x, *parametros_beta)  # Distribuição beta
+pdf_gamma = gamma.pdf(x, *parametros_gamma)
+pdf_exponencial = expon.pdf(x, *parametros_exponencial)
+
+cdf_norm = norm.cdf(x, *parametros_norm)
+cdf_beta = beta.cdf(x, *parametros_beta)  # Distribuição beta
+cdf_gamma = gamma.cdf(x, *parametros_gamma)
+cdf_exponencial = expon.cdf(x, *parametros_exponencial)
+
+
+
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 8))
+fig.subplots_adjust(hspace=0.4)
+
+# Distribuição Normal
+ax1 = axes[0,0]
+ax1.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax1.plot(x, pdf_norm, 'r-', label='Normal')
+ax1.set_xlabel('Vazões Médias Anuais')
+ax1.set_ylabel('Densidade de Probabilidade')
+ax1.set_title('Distribuição Normal')
+
+ax2 = ax1.twinx()
+ax2.plot(x, cdf_norm, 'g--', label='Normal acumulada')
+lines1, labels1 = ax1.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+
+ax1.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+# Repita o processo para os outros subplots
+ax3 = axes[0, 1]
+ax3.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax3.plot(x, pdf_beta, 'g-', label='Log-Normal')
+ax3.set_xlabel('Vazões Médias Anuais')
+ax3.set_ylabel('Densidade de Probabilidade')
+ax3.legend()
+ax3.set_title('Distribuição Beta')
+
+ax4 = ax3.twinx()
+ax4.plot(x, cdf_beta, 'c--', label='Beta acumulada')
+
+lines1, labels1 = ax3.get_legend_handles_labels()
+lines2, labels2 = ax4.get_legend_handles_labels()
+
+ax3.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+
+ax5 = axes[1, 0]
+ax5.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax5.plot(x, pdf_gamma, 'y-', label='Gama')
+ax5.set_xlabel('Vazões Médias Anuais')
+ax5.set_ylabel('Densidade de Probabilidade')
+ax5.legend()
+ax5.set_title('Distribuição Gama')
+
+ax6 = ax5.twinx()
+ax6.plot(x, cdf_gamma, 'k--', label='Gama Acumulada')
+lines1, labels1 = ax5.get_legend_handles_labels()
+lines2, labels2 = ax6.get_legend_handles_labels()
+ax5.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+
+ax7 = axes[1, 1]
+ax7.hist(dados, bins=20, density=True, alpha=0.5, color='b', label='Histograma')
+ax7.plot(x, pdf_exponencial, 'm-', label='Exponencial')
+ax7.set_xlabel('Vazões Médias Anuais')
+ax7.set_ylabel('Densidade de Probabilidade')
+ax7.set_title('Distribuição Exponencial')
+
+ax8 = ax7.twinx()
+ax8.plot(x, cdf_exponencial, 'r--', label='Exponencial Acumulada')
+lines1, labels1 = ax7.get_legend_handles_labels()
+lines2, labels2 = ax8.get_legend_handles_labels()
+
+ax8.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+
+
+
+plt.savefig("../imagens/16 distribuiçoes das vazoes minimas medias de 7 dias anuais.png", dpi=300, bbox_inches='tight')
+
+
